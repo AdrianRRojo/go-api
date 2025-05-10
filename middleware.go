@@ -2,11 +2,18 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
 )
+
+type requestStruct struct {
+	Token string
+}
 
 // TODO:
 //	[x] 1. Logging
@@ -31,4 +38,19 @@ func Logging(next http.Handler) http.Handler {
 		}
 		writer.Flush()
 	})
+}
+
+func readBody(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+
+	for {
+		var t requestStruct
+
+		if err := decoder.Decode(&t); err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Token Value: %s \n", t.Token)
+	}
 }

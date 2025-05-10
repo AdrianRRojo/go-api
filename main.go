@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 )
 
@@ -20,15 +19,8 @@ func main() {
 	})
 
 	router.HandleFunc("POST /enter", func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "Could not read request body", http.StatusBadRequest)
-			fmt.Println("Error reading request body", err)
-		}
+		readBody(w, r)
 
-		defer r.Body.Close()
-
-		fmt.Fprintf(w, "Request body: %s \n", string(body))
 	})
 
 	server := http.Server{
