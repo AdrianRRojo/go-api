@@ -20,7 +20,11 @@ func main() {
 
 	router.HandleFunc("POST /enter", func(w http.ResponseWriter, r *http.Request) {
 		readBody(r)
+	})
 
+	router.HandleFunc("GET /getStatus/{id...}", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		fmt.Fprintln(w, id)
 	})
 
 	server := http.Server{
