@@ -19,7 +19,7 @@ func main() {
 	})
 
 	router.HandleFunc("POST /enter", func(w http.ResponseWriter, r *http.Request) {
-		readBody(w, r)
+		readBody(r)
 
 	})
 

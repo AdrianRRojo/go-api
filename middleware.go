@@ -12,7 +12,7 @@ import (
 )
 
 type requestStruct struct {
-	Token string
+	Addr, Token string
 }
 
 // TODO:
@@ -40,11 +40,12 @@ func Logging(next http.Handler) http.Handler {
 	})
 }
 
-func readBody(w http.ResponseWriter, r *http.Request) {
+func readBody(r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	for {
 		var t requestStruct
+		t.Addr = r.RemoteAddr
 
 		if err := decoder.Decode(&t); err == io.EOF {
 			break
@@ -52,5 +53,6 @@ func readBody(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 		fmt.Printf("Token Value: %s \n", t.Token)
+		fmt.Printf("Addr Value: %s \n", t.Addr)
 	}
 }
