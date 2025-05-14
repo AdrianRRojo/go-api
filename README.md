@@ -86,6 +86,4 @@ The application supports two modes:
 curl -X POST http://127.0.0.1:8080/enter \                        
      -H "Content-Type: application/json" \
      -d '{"name":"Adrian","email":"arojo@arojo.com", "age":25, "token":"TestToken"}' 
-
-
 ```

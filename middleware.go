@@ -43,13 +43,13 @@ func Logging(next http.Handler) http.Handler {
 
 		logFile, err := os.OpenFile("api-log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			log.Fatal("Could not open log file:", err)
+			log.Println("Could not open log file:", err)
 		}
 		defer logFile.Close()
 
 		writer := bufio.NewWriter(logFile)
 		if _, err := writer.Write(strByte); err != nil {
-			panic(err)
+			log.Println(err)
 		}
 		writer.Flush()
 	})
@@ -80,12 +80,12 @@ func connectDB() *mongo.Client {
 
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	err = client.Ping(ctx, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	fmt.Println("Connected to MongoDB!")
@@ -98,7 +98,7 @@ func Auth(req requestStruct) (companyID string, isAuth bool) {
 	})
 
 	if err != nil {
-		log.Fatal("Error reading Token: ", err)
+		log.Println("Error reading Token: ", err)
 		return "", false
 	}
 
@@ -129,7 +129,7 @@ func insertOne(collection *mongo.Collection, req requestStruct, companyID string
 	}
 	result, err := collection.InsertOne(ctx, document)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	fmt.Println("Inserted document ID:", result.InsertedID)
 	return result.InsertedID
@@ -147,7 +147,7 @@ func insertNewCompany(collection *mongo.Collection, t tokenStruct) interface{} {
 	}
 	result, err := collection.InsertOne(ctx, document)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	fmt.Println("Inserted document ID:", result.InsertedID)
 	return result.InsertedID
@@ -164,7 +164,7 @@ func getOneByEmail(collection *mongo.Collection, req requestStruct) (interface{}
 		if err == mongo.ErrNoDocuments {
 			return result, err
 		}
-		panic(err)
+		log.Println(err)
 	}
 
 	return result, err
