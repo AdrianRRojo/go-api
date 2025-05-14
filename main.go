@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Response struct {
@@ -41,9 +42,24 @@ func main() {
 		fmt.Fprintf(w, "Insert ID: %v", id)
 	})
 
-	router.HandleFunc("GET /getByID/{id...}", func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		fmt.Fprintln(w, id)
+	router.HandleFunc("POST /getByEmail", func(w http.ResponseWriter, r *http.Request) {
+		reqData, err := readBody(r)
+		if err != nil {
+			http.Error(w, "Invalid Request", http.StatusBadRequest)
+			return
+		}
+
+		user, err := getOneByEmail(collection, reqData)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(w, "User not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Fprintf(w, "User: %+v", user)
 	})
 
 	server := http.Server{

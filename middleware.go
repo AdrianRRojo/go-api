@@ -17,6 +17,7 @@ import (
 
 type requestStruct struct {
 	Name  string `json:"name"`
+	Email string `json:"email"`
 	Age   int    `json:"age"`
 	Token string `json:"token"`
 	Addr  string `json:"addr"`
@@ -90,6 +91,7 @@ func insertOne(collection *mongo.Collection, req requestStruct) interface{} {
 
 	document := bson.D{
 		{Key: "name", Value: req.Name},
+		{Key: "email", Value: req.Email},
 		{Key: "age", Value: req.Age},
 		{Key: "token", Value: req.Token},
 		{Key: "addr", Value: req.Addr},
@@ -100,4 +102,20 @@ func insertOne(collection *mongo.Collection, req requestStruct) interface{} {
 	}
 	fmt.Println("Inserted document ID:", result.InsertedID)
 	return result.InsertedID
+}
+func getOneByEmail(collection *mongo.Collection, req requestStruct) (interface{}, error) {
+
+	document := bson.D{{Key: "email", Value: req.Email}}
+
+	var result requestStruct
+	err := collection.FindOne(context.TODO(), document).Decode(&result)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return result, err
+		}
+		panic(err)
+	}
+
+	return result, err
 }
