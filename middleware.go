@@ -2,17 +2,24 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type requestStruct struct {
-	Addr, Token string
+	Name  string `json:"name"`
+	Age   int    `json:"age"`
+	Token string `json:"token"`
+	Addr  string `json:"addr"`
 }
 
 // TODO:
@@ -40,19 +47,57 @@ func Logging(next http.Handler) http.Handler {
 	})
 }
 
-func readBody(r *http.Request) {
+func readBody(r *http.Request) (requestStruct, error) {
 	decoder := json.NewDecoder(r.Body)
 
-	for {
-		var t requestStruct
-		t.Addr = r.RemoteAddr
+	var t requestStruct
+	t.Addr = r.RemoteAddr
 
-		if err := decoder.Decode(&t); err == io.EOF {
-			break
-		} else if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Token Value: %s \n", t.Token)
-		fmt.Printf("Addr Value: %s \n", t.Addr)
+	if err := decoder.Decode(&t); err != nil {
+		return t, err
 	}
+
+	fmt.Printf("Token Value: %s \n", t.Token)
+	fmt.Printf("Addr Value: %s \n", t.Addr)
+
+	return t, nil
+
+}
+
+func connectDB() *mongo.Client {
+	// fmt.Printf("URI: %s", os.Getenv("MONGO_URI"))
+	clientOptions := options.Client().ApplyURI(os.Getenv("MONGO_URI"))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = client.Ping(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connected to MongoDB!")
+	return client
+}
+
+func insertOne(collection *mongo.Collection, req requestStruct) interface{} {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	document := bson.D{
+		{Key: "name", Value: req.Name},
+		{Key: "age", Value: req.Age},
+		{Key: "token", Value: req.Token},
+		{Key: "addr", Value: req.Addr},
+	}
+	result, err := collection.InsertOne(ctx, document)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Inserted document ID:", result.InsertedID)
+	return result.InsertedID
 }

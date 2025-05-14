@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type Response struct {
@@ -10,6 +14,14 @@ type Response struct {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	client := connectDB()
+	db := client.Database(os.Getenv("DB"))
+	collection := db.Collection(os.Getenv("DB_COLLECTION"))
+
 	router := http.NewServeMux()
 
 	// Will only accept GET Routes. If not mentioned, route will accept any method
@@ -19,10 +31,17 @@ func main() {
 	})
 
 	router.HandleFunc("POST /enter", func(w http.ResponseWriter, r *http.Request) {
-		readBody(r)
+		reqData, err := readBody(r)
+		if err != nil {
+			http.Error(w, "Invalid Request", http.StatusBadRequest)
+			return
+		}
+
+		id := insertOne(collection, reqData)
+		fmt.Fprintf(w, "Insert ID: %v", id)
 	})
 
-	router.HandleFunc("GET /getStatus/{id...}", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("GET /getByID/{id...}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		fmt.Fprintln(w, id)
 	})
