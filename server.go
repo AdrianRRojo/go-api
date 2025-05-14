@@ -40,17 +40,25 @@ func runServer(collection *mongo.Collection) {
 			return
 		}
 
-		user, err := getOneByEmail(collection, reqData)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				http.Error(w, "User not found", http.StatusNotFound)
+		_, isAuth := Auth(reqData)
+		if isAuth {
+
+			user, err := getOneByEmail(collection, reqData)
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					http.Error(w, "User not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, "Server error", http.StatusInternalServerError)
 				return
 			}
-			http.Error(w, "Server error", http.StatusInternalServerError)
+
+			fmt.Fprintf(w, "User: %+v", user)
+		} else {
+			http.Error(w, "Invalid Token", http.StatusBadRequest)
 			return
 		}
 
-		fmt.Fprintf(w, "User: %+v", user)
 	})
 
 	server := http.Server{
