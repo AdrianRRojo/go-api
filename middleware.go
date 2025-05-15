@@ -29,16 +29,61 @@ type tokenStruct struct {
 	Exp       int64  `json:"exp"`
 	Token     string `json:"token"`
 }
+type responseStruct struct {
+	http.ResponseWriter
+	statusCode int
+	body       []byte
+}
+
+func (r *responseStruct) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+func (r *responseStruct) Write(b []byte) (int, error) {
+	r.body = append(r.body, b...)
+	return r.ResponseWriter.Write(b)
+}
 
 // TODO:
 //	[x] 1. Logging
 //	[x] 2. Auth
 
-func Logging(next http.Handler) http.Handler {
+func Logging(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
+		recorder := &responseStruct{ResponseWriter: w, statusCode: http.StatusOK}
 
-		message := "From " + r.RemoteAddr + ": " + r.Method + " " + r.URL.Path + " " + time.Now().Format(time.DateTime) + " " + "\n"
+		handler.ServeHTTP(recorder, r)
+
+		req, err := readBody(r)
+
+		var errMessage string
+		if err != nil {
+			// http.Error(w, "Invalid Request", http.StatusBadRequest)
+			fmt.Println("Invalid Request")
+			errMessage = err.Error()
+		} else {
+			errMessage = "No errors reading request"
+		}
+
+		companyID, isAuth := Auth(req)
+
+		bodyBytes, _ := json.Marshal(req)
+
+		// message = "From " + r.RemoteAddr + ": \n\t Method:" + r.Method + " Path: " + r.URL.Path + " Time: " + time.Now().Format(time.DateTime) + " \n\t Token Data:" + companyID + " " + "Is Auth: " + fmt.Sprintf("%v", isAuth) + " \n\t Body: " + string(bodyBytes) + " \n\t Error: " + message
+		message := fmt.Sprintf(
+			"\n From %s:\n\tMethod: %s Path: %s Time: %s\n\tToken Data: CompanyID: %s Is Auth: %v\n\tRequest Body: %s\n\tResponse Status: %d\n\tResponse Body: %s\n\tErrors Reading Request: %s\n\t",
+			r.RemoteAddr,
+			r.Method,
+			r.URL.Path,
+			time.Now().Format(time.DateTime),
+			companyID,
+			isAuth,
+			string(bodyBytes),
+			recorder.statusCode,
+			string(recorder.body),
+			errMessage,
+		)
+
 		strByte := []byte(message)
 
 		logFile, err := os.OpenFile("api-log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
