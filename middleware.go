@@ -32,7 +32,7 @@ type tokenStruct struct {
 
 // TODO:
 //	[x] 1. Logging
-//	[] 2. Auth
+//	[x] 2. Auth
 
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
