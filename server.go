@@ -17,16 +17,25 @@ func runServer(collection *mongo.Collection) {
 	})
 
 	router.HandleFunc("POST /enter", func(w http.ResponseWriter, r *http.Request) {
+		// log.Printf("Handler invoked: Method=%s, Path=%s, RemoteAddr=%s\n", r.Method, r.URL.Path, r.RemoteAddr)
 		reqData, err := readBody(r)
 		if err != nil {
-			http.Error(w, "Invalid Request", http.StatusBadRequest)
+			http.Error(w, "Invalid Request ", http.StatusBadRequest)
 			return
 		}
+		// fmt.Printf("Token Value (raw): %q\n", reqData.Token)
 
 		companyID, isAuth := Auth(reqData)
 		if isAuth {
-			id := insertOne(collection, reqData, companyID)
-			fmt.Fprintf(w, "Insert ID: %v", id)
+			_, error := insertOne(collection, reqData, companyID)
+
+			if error != nil {
+				http.Error(w, "Error: Could not submit request", http.StatusBadRequest)
+			}
+			// fmt.Fprintf(w, "Insert ID: %v", id)
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintf(w, "Successfully submitted request")
+
 		} else {
 			http.Error(w, "Invalid Token", http.StatusBadRequest)
 			return

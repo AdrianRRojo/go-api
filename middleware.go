@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -44,44 +47,38 @@ func (r *responseStruct) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
-// TODO:
-//	[x] 1. Logging
-//	[x] 2. Auth
-
 func Logging(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recorder := &responseStruct{ResponseWriter: w, statusCode: http.StatusOK}
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(recorder, "Error reading request body for logging", http.StatusInternalServerError)
+			return
+		}
+
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		handler.ServeHTTP(recorder, r)
 
-		req, err := readBody(r)
+		var logReqData requestStruct
+		if len(bodyBytes) > 0 {
+			err := json.Unmarshal(bodyBytes, &logReqData)
+			if err != nil {
 
-		var errMessage string
-		if err != nil {
-			// http.Error(w, "Invalid Request", http.StatusBadRequest)
-			fmt.Println("Invalid Request")
-			errMessage = err.Error()
-		} else {
-			errMessage = "No errors reading request"
+				log.Printf("Warning: Could not unmarshal body for logging: %v", err)
+			}
 		}
-
-		companyID, isAuth := Auth(req)
-
-		bodyBytes, _ := json.Marshal(req)
-
-		// message = "From " + r.RemoteAddr + ": \n\t Method:" + r.Method + " Path: " + r.URL.Path + " Time: " + time.Now().Format(time.DateTime) + " \n\t Token Data:" + companyID + " " + "Is Auth: " + fmt.Sprintf("%v", isAuth) + " \n\t Body: " + string(bodyBytes) + " \n\t Error: " + message
+		logReqData.Addr = r.RemoteAddr
 		message := fmt.Sprintf(
-			"\n From %s:\n\tMethod: %s Path: %s Time: %s\n\tToken Data: CompanyID: %s Is Auth: %v\n\tRequest Body: %s\n\tResponse Status: %d\n\tResponse Body: %s\n\tErrors Reading Request: %s\n\t",
+			"\n From %s:\n\tMethod: %s Path: %s Time: %s\n\tRequest Body: %s\n\tResponse Status: %d\n\tResponse Body: %s\n\tErrors Reading Request: %s\n\t",
 			r.RemoteAddr,
 			r.Method,
 			r.URL.Path,
 			time.Now().Format(time.DateTime),
-			companyID,
-			isAuth,
 			string(bodyBytes),
 			recorder.statusCode,
 			string(recorder.body),
-			errMessage,
+			"",
 		)
 
 		strByte := []byte(message)
@@ -101,6 +98,7 @@ func Logging(handler http.Handler) http.Handler {
 }
 
 func readBody(r *http.Request) (requestStruct, error) {
+	// fmt.Printf("Test: %s \n", r)
 	decoder := json.NewDecoder(r.Body)
 
 	var t requestStruct
@@ -110,7 +108,7 @@ func readBody(r *http.Request) (requestStruct, error) {
 		return t, err
 	}
 
-	fmt.Printf("Token Value: %s \n", t.Token)
+	fmt.Printf("Token Value (raw): %q\n", t.Token)
 	fmt.Printf("Addr Value: %s \n", t.Addr)
 
 	return t, nil
@@ -138,30 +136,48 @@ func connectDB() *mongo.Client {
 }
 
 func Auth(req requestStruct) (companyID string, isAuth bool) {
-	token, err := jwt.Parse(req.Token, func(t *jwt.Token) (interface{}, error) {
+
+	// log.Printf("DEBUG: Auth function received req.Token: %q, Length: %d\n", req.Token, len(req.Token))
+
+	tokenString := strings.TrimSpace(req.Token)
+
+	// log.Printf("DEBUG: Auth function after TrimSpace: %q, Length: %d\n", tokenString, len(tokenString))
+
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
 		return []byte(os.Getenv("API_SECRET")), nil
 	})
 
 	if err != nil {
-		log.Println("Error reading Token: ", err)
+		log.Println("Error reading Token - Auth: ", err)
 		return "", false
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if companyID, ok := claims["companyID"].(string); ok && companyID != "" {
-			// check if the token has expired
+			// Check if the token has expired
 			if exp, ok := claims["exp"].(float64); ok {
 				expirationTime := time.Unix(int64(exp), 0)
 				if time.Now().Before(expirationTime) {
 					return companyID, true
+				} else {
+					log.Println("Token has expired")
 				}
+			} else {
+				log.Println("Claim 'exp' not found or not a float64")
 			}
+		} else {
+			log.Println("Claim 'companyID' not found or not a string")
 		}
+	} else {
+		log.Println("Token claims invalid or token not valid")
 	}
 	return "", false
 }
 
-func insertOne(collection *mongo.Collection, req requestStruct, companyID string) interface{} {
+func insertOne(collection *mongo.Collection, req requestStruct, companyID string) (interface{}, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -176,8 +192,8 @@ func insertOne(collection *mongo.Collection, req requestStruct, companyID string
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("Inserted document ID:", result.InsertedID)
-	return result.InsertedID
+	// fmt.Println("Inserted document ID:", result.InsertedID)
+	return result.InsertedID, nil
 }
 
 func insertNewCompany(collection *mongo.Collection, t tokenStruct) interface{} {
