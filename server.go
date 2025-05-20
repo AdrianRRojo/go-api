@@ -30,7 +30,8 @@ func runServer(collection *mongo.Collection) {
 			_, error := insertOne(collection, reqData, companyID)
 
 			if error != nil {
-				http.Error(w, "Error: Could not submit request", http.StatusBadRequest)
+				http.Error(w, fmt.Sprintf("Error: Could not submit request. \n %s", error), http.StatusBadRequest)
+				return
 			}
 			// fmt.Fprintf(w, "Insert ID: %v", id)
 			w.WriteHeader(http.StatusCreated)
