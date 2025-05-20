@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -108,8 +109,8 @@ func readBody(r *http.Request) (requestStruct, error) {
 		return t, err
 	}
 
-	fmt.Printf("Token Value (raw): %q\n", t.Token)
-	fmt.Printf("Addr Value: %s \n", t.Addr)
+	// fmt.Printf("Token Value (raw): %q\n", t.Token)
+	// fmt.Printf("Addr Value: %s \n", t.Addr)
 
 	return t, nil
 
@@ -181,6 +182,9 @@ func insertOne(collection *mongo.Collection, req requestStruct, companyID string
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	if req.Name == "" || req.Email == "" || req.Age == 0 || companyID == "" || req.Addr == "" {
+		return 0, errors.New("missing Fields")
+	}
 	document := bson.D{
 		{Key: "name", Value: req.Name},
 		{Key: "email", Value: req.Email},
